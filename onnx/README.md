@@ -10,8 +10,8 @@ pip install onnxruntime-directml -i https://pypi.tuna.tsinghua.edu.cn/simple/
 
 server.py 修改
 ```
-    embedding_objs = await predict(_represent, img)
-    # embedding_objs = _represent(img)  # DmlExecutionProvider使用异步并发时会导致程序退出
+    # embedding_objs = await predict(_represent, img)
+    embedding_objs = _represent(img)  # DmlExecutionProvider使用异步并发时会导致程序退出
 ```
 
 
