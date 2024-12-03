@@ -250,7 +250,7 @@ async def process_image(file: UploadFile = File(...), api_key: str = Depends(ver
         data = {"detector_backend": detector_backend, "recognition_model": recognition_model}
 
         embedding_objs = await predict(_represent, img, face_model)
-        # embedding_objs = _represent(img)  # DmlExecutionProvider使用异步并发时会导致程序退出
+        # embedding_objs = _represent(img,face_model)  # DmlExecutionProvider使用异步并发时会导致程序退出
         del img
         data["result"] = embedding_objs
         # logging.info("detector_backend: %s", detector_backend)
