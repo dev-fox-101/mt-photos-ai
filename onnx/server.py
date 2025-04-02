@@ -293,4 +293,4 @@ def restart_program():
 
 
 if __name__ == "__main__":
-    uvicorn.run("server:app", host="0.0.0.0", port=http_port)
+    uvicorn.run("server:app", host=None, port=http_port)
