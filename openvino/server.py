@@ -40,7 +40,7 @@ clip_img_model = None
 clip_txt_model = None
 face_model = None
 
-
+face_analysis_device = os.getenv("DEVICE_TYPE", "GPU") #值：GPU || CPU ,指定使用核显还是CPU识别,默认GPU， 创建容器时，需要 --device /dev/dri:/dev/dri
 detector_backend = os.getenv("DETECTOR_BACKEND", "insightface")
 recognition_model = os.getenv("RECOGNITION_MODEL", "buffalo_l")
 detection_thresh = float(os.getenv("DETECTION_THRESH", "0.65"))
@@ -74,7 +74,7 @@ def load_clip_txt_model():
 def load_face_model():
     global face_model
     if face_model is None:
-        faceAnalysis = FaceAnalysis(providers= ["OpenVINOExecutionProvider","CPUExecutionProvider"],root=model_folder_path, allowed_modules=['detection', 'recognition'], name=recognition_model)
+        faceAnalysis = FaceAnalysis(providers= ["OpenVINOExecutionProvider"],provider_options=[{"device_type": face_analysis_device, "precision": "FP32"}],root=model_folder_path, allowed_modules=['detection', 'recognition'], name=recognition_model)
         faceAnalysis.prepare(ctx_id=0, det_thresh=detection_thresh, det_size=(640, 640))
         face_model = faceAnalysis
 
@@ -198,7 +198,8 @@ async def clip_process_image(file: UploadFile = File(...), api_key: str = Depend
     try:
         nparr = np.frombuffer(image_bytes, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        result = await predict(clip.process_image, img, clip_img_model)
+        # result = await predict(clip.process_image, img, clip_img_model)
+        result = clip.process_image(img, clip_img_model) # 避免 Infer Request is busy 错误
         return {'result': ["{:.16f}".format(vec) for vec in result]}
     except Exception as e:
         print(e)
@@ -208,7 +209,8 @@ async def clip_process_image(file: UploadFile = File(...), api_key: str = Depend
 async def clip_process_txt(request:ClipTxtRequest, api_key: str = Depends(verify_header)):
     load_clip_txt_model()
     text = request.text
-    result = await predict(clip.process_txt, text, clip_txt_model)
+    # result = await predict(clip.process_txt, text, clip_txt_model)
+    result = clip.process_txt(text, clip_txt_model) # 避免 Infer Request is busy 错误
     return {'result': ["{:.16f}".format(vec) for vec in result]}
 
 
@@ -286,4 +288,4 @@ def restart_program():
 
 
 if __name__ == "__main__":
-    uvicorn.run("server:app", host="0.0.0.0", port=http_port)
+    uvicorn.run("server:app", host=None, port=http_port)
