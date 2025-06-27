@@ -29,6 +29,7 @@ COPY ./_insightface_root /root/.insightface
 
 COPY server.py .
 
+ENV NO_ALBUMENTATIONS_UPDATE=1
 ENV API_AUTH_KEY=mt_photos_ai_extra
 EXPOSE 8060
 
