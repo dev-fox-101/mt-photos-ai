@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+import gc
 import os
 import sys
 import threading
@@ -169,7 +170,8 @@ async def check_req(api_key: str = Depends(verify_header)):
 @app.post("/restart_v2")
 async def check_req(api_key: str = Depends(verify_header)):
     # 预留触发服务重启接口-自动释放内存
-    restart_program()
+    # Let FastAPI send the response before the OpenVINO worker exits.
+    threading.Timer(0.5, restart_program).start()
     return {'result': 'pass'}
 
 @app.post("/ocr")
@@ -282,7 +284,64 @@ def _represent(img):
 async def predict(predict_func, inputs,model):
     return await asyncio.get_running_loop().run_in_executor(None, predict_func, inputs,model)
 
+def release_models():
+    global rapid_ocr
+    global clip_img_model
+    global clip_txt_model
+    global face_model
+
+    compiled_models = (clip_img_model, clip_txt_model)
+    for model in compiled_models:
+        if model is None:
+            continue
+
+        release_memory = getattr(model, "release_memory", None)
+        if callable(release_memory):
+            try:
+                release_memory()
+            except Exception as err:
+                logging.warning("Failed to release OpenVINO model memory: %s", err)
+
+    face_model = None
+    rapid_ocr = None
+    clip_img_model = None
+    clip_txt_model = None
+
+    del compiled_models
+    del model
+    gc.collect()
+
+
+def mark_gpu_fds_close_on_exec():
+    if not sys.platform.startswith("linux"):
+        return
+
+    try:
+        fd_names = os.listdir("/proc/self/fd")
+    except OSError:
+        return
+
+    for fd_name in fd_names:
+        try:
+            fd = int(fd_name)
+            if fd <= 2:
+                continue
+
+            target = os.readlink(f"/proc/self/fd/{fd}")
+            if target == "/dev/dxg" or target.startswith("/dev/dri/"):
+                os.set_inheritable(fd, False)
+        except (OSError, ValueError):
+            pass
+
+
 def restart_program():
+    print(
+        "Restarting service to unload AI models and release memory/GPU resources...",
+        flush=True,
+    )
+    release_models()
+    mark_gpu_fds_close_on_exec()
+
     python = sys.executable
     os.execl(python, python, *sys.argv)
 
